@@ -8,6 +8,8 @@
 | **테스트 수행** | 176건 (API 91 · UI 20×3브라우저 · 외부 24 · 초기화 1) |
 | **검출 결함** | 21건 (자체 SUT 16 + 외부 공개 API 5) |
 | **적용 기법** | 동등분할 · 경계값 분석 · 결정표 · 상태 전이 · 오류 추정 |
+
+저장소: https://github.com/ganggeon/qa-automation-playwright
 | **기술 스택** | Playwright(TypeScript) · Postman/Newman · Ajv · GitHub Actions |
 | **실행 시간** | 전체 약 50초(벽시계) / Fail 0 |
 
