@@ -1,0 +1,30 @@
+{
+  "name": "qa-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Software QA 학습 및 포트폴리오 - 테스트 설계 / API 테스트 / UI 자동화",
+  "scripts": {
+    "sut": "node sut/server.js",
+    "test": "playwright test --project=api --project=ui",
+    "test:all": "playwright test",
+    "test:api": "playwright test --project=api",
+    "test:ui": "playwright test --project=ui",
+    "test:crossbrowser": "playwright test --project=ui --project=ui-firefox --project=ui-webkit",
+    "test:external": "playwright test --project=external-api --project=external-ui",
+    "test:headed": "playwright test --project=ui --headed",
+    "test:debug": "playwright test --debug",
+    "report": "playwright show-report",
+    "newman": "newman run postman/minishop.postman_collection.json -e postman/local.postman_environment.json -r cli,htmlextra --reporter-htmlextra-export reports/newman/index.html",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@types/node": "^22.10.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "express": "^4.21.2",
+    "newman": "^6.2.2",
+    "newman-reporter-htmlextra": "^1.23.1",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,431 @@
+{
+  "info": {
+    "name": "MiniShop API",
+    "description": "MiniShop QA 실습용 API 컬렉션. Playwright 자동화와 별개로, Postman/Newman 기반 API 테스트 역량을 보여주기 위한 산출물이다.\n\n실행:\n  npm run sut          # SUT 기동\n  npm run newman       # 컬렉션 실행 + HTML 리포트\n\n각 요청의 Tests 탭에는 상태코드 / 응답시간 / 스키마 / 비즈니스 규칙 검증이 들어 있다.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4010" },
+    { "key": "token", "value": "" },
+    { "key": "email", "value": "" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// 컬렉션 전체에 적용되는 사전 스크립트",
+          "// 실행할 때마다 겹치지 않는 이메일을 만들어 둔다.",
+          "if (!pm.collectionVariables.get('email')) {",
+          "    pm.collectionVariables.set('email', 'postman_' + Date.now() + '@test.com');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "00. 준비",
+      "item": [
+        {
+          "name": "SUT 초기화",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/_reset", "host": ["{{baseUrl}}"], "path": ["api", "_reset"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('상태코드 200', function () { pm.response.to.have.status(200); });",
+                  "pm.collectionVariables.set('email', 'postman_' + Date.now() + '@test.com');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01. 회원 / 인증",
+      "item": [
+        {
+          "name": "회원가입 - 정상",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"Qa123456\",\n  \"age\": 30\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/users", "host": ["{{baseUrl}}"], "path": ["api", "users"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('상태코드 201', function () { pm.response.to.have.status(201); });",
+                  "",
+                  "pm.test('응답 시간 1초 이내', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "});",
+                  "",
+                  "pm.test('응답 스키마가 규격과 일치한다', function () {",
+                  "    pm.response.to.have.jsonSchema({",
+                  "        type: 'object',",
+                  "        required: ['id', 'email'],",
+                  "        additionalProperties: false,",
+                  "        properties: { id: { type: 'integer' }, email: { type: 'string' } }",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('[보안] 응답에 비밀번호가 포함되지 않는다', function () {",
+                  "    pm.expect(pm.response.text()).to.not.include('Qa123456');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "회원가입 - 경계값 비밀번호 7자 (400 기대)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"short_{{$timestamp}}@test.com\",\n  \"password\": \"Qa12345\",\n  \"age\": 30\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/users", "host": ["{{baseUrl}}"], "path": ["api", "users"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('상태코드 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('오류 코드가 INVALID_PASSWORD', function () {",
+                  "    pm.expect(pm.response.json().error.code).to.eql('INVALID_PASSWORD');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "회원가입 - 경계값 비밀번호 21자 (400 기대 / BUG-001)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"long_{{$timestamp}}@test.com\",\n  \"password\": \"Qa1xxxxxxxxxxxxxxxxxx\",\n  \"age\": 30\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/users", "host": ["{{baseUrl}}"], "path": ["api", "users"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// BUG-001 재현. 수정 전에는 이 테스트가 실패하는 것이 정상이다.",
+                  "pm.test('[BUG-001] 21자 비밀번호는 거부되어야 한다', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "로그인 - 정상 (토큰 저장)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"Qa123456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('상태코드 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('토큰이 발급된다', function () {",
+                  "    pm.expect(body.token).to.be.a('string').and.to.have.length.above(8);",
+                  "});",
+                  "",
+                  "// 이후 요청에서 쓰도록 변수에 저장한다 (요청 간 데이터 전달)",
+                  "pm.collectionVariables.set('token', body.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "로그인 - 비밀번호 불일치 (401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"WrongPw123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('상태코드 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('오류 코드가 INVALID_CREDENTIALS', function () {",
+                  "    pm.expect(pm.response.json().error.code).to.eql('INVALID_CREDENTIALS');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02. 상품",
+      "item": [
+        {
+          "name": "상품 목록 - 기본",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/products", "host": ["{{baseUrl}}"], "path": ["api", "products"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('상태코드 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('기본 페이지 크기는 10건', function () {",
+                  "    pm.expect(body.size).to.eql(10);",
+                  "    pm.expect(body.items).to.have.lengthOf(10);",
+                  "});",
+                  "",
+                  "pm.test('모든 상품의 재고는 0 이상이다', function () {",
+                  "    body.items.forEach(function (p) {",
+                  "        pm.expect(p.stock, p.name + ' 재고').to.be.at.least(0);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "상품 목록 - 경계값 size=0 (400 기대 / BUG-006)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?size=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [{ "key": "size", "value": "0" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[BUG-006] size=0은 400으로 거부되어야 한다', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "상품 상세 - 없는 id (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/products/99999", "host": ["{{baseUrl}}"], "path": ["api", "products", "99999"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('상태코드 404', function () { pm.response.to.have.status(404); });",
+                  "pm.test('오류 코드가 PRODUCT_NOT_FOUND', function () {",
+                  "    pm.expect(pm.response.json().error.code).to.eql('PRODUCT_NOT_FOUND');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03. 장바구니 / 주문",
+      "item": [
+        {
+          "name": "장바구니 담기 - 토큰 없음 (401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": 1,\n  \"qty\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/api/cart", "host": ["{{baseUrl}}"], "path": ["api", "cart"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('상태코드 401', function () { pm.response.to.have.status(401); });"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "장바구니 담기 - 정상",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": 12,\n  \"qty\": 3\n}" },
+            "url": { "raw": "{{baseUrl}}/api/cart", "host": ["{{baseUrl}}"], "path": ["api", "cart"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('상태코드 201', function () { pm.response.to.have.status(201); });",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('소계 = 가격 x 수량', function () {",
+                  "    body.items.forEach(function (i) {",
+                  "        pm.expect(i.subtotal).to.eql(i.price * i.qty);",
+                  "    });",
+                  "});",
+                  "pm.test('총액은 42,000원', function () {",
+                  "    pm.expect(body.totalPrice).to.eql(42000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "장바구니 담기 - 경계값 수량 0 (400 기대 / BUG-008)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": 1,\n  \"qty\": 0\n}" },
+            "url": { "raw": "{{baseUrl}}/api/cart", "host": ["{{baseUrl}}"], "path": ["api", "cart"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[BUG-008] 수량 0은 400으로 거부되어야 한다', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "주문 - 쿠폰 적용 (결정표 R6)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"couponCode\": \"SAVE5000\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api", "orders"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('상태코드 201', function () { pm.response.to.have.status(201); });",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('할인 5,000원이 적용된다', function () {",
+                  "    pm.expect(body.discount).to.eql(5000);",
+                  "    pm.expect(body.finalPrice).to.eql(body.totalPrice - 5000);",
+                  "});",
+                  "pm.test('결제금액은 0원 이상이다', function () {",
+                  "    pm.expect(body.finalPrice).to.be.at.least(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "주문 - 빈 장바구니 (결정표 R1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"couponCode\": null\n}" },
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api", "orders"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('상태코드 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('오류 코드가 EMPTY_CART', function () {",
+                  "    pm.expect(pm.response.json().error.code).to.eql('EMPTY_CART');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

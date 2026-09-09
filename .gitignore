@@ -1,0 +1,21 @@
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+reports/
+*.log
+.env
+.env.*
+sut/data/runtime-*.json
+
+# 학습 기록 — 공개 저장소에 올리지 않는다 (2026-09-08 결정)
+PROGRESS.md
+my-work/
+
+# 낡은 멀티 PC 전제 문서 — PC 동기화 안 하기로 함(2026-09-08), PROGRESS.md 링크도 걸려있어 보류 (S57)
+설치가이드.md
+
+# 에디터
+.vscode/
+.idea/

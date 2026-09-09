@@ -1,0 +1,134 @@
+name: QA Test Suite
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  # 야간 정기 실행. 외부 데모 사이트가 바뀌었는지 매일 확인하는 목적도 겸한다.
+  schedule:
+    - cron: '0 18 * * *' # UTC 18:00 = KST 03:00
+  workflow_dispatch:
+
+jobs:
+  # ── 1. 자체 SUT 대상 테스트 (반드시 통과해야 함) ──────────────────────────
+  local:
+    name: MiniShop (API + UI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: 타입 검사
+        run: npm run typecheck
+
+      - name: 브라우저 설치
+        run: npx playwright install --with-deps chromium
+
+      - name: 테스트 실행 (API + UI)
+        run: npx playwright test --project=api --project=ui
+
+      # 이 job은 api + ui 만 실행한다. 따라서 여기서 생성되는 결과 문서는
+      # **부분 실행 결과**다. report-to-csv.js 가 문서 머리에 범위를 명시하고,
+      # 아티팩트 이름도 전체 결과와 구분되게 붙인다.
+      # (저장소에 커밋된 artifacts/04-* 는 전체 스위트 실행 결과다)
+      - name: 결과 리포트 변환 (api + ui 범위)
+        if: ${{ !cancelled() }}
+        run: node utils/report-to-csv.js
+
+      - name: 리포트 업로드
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-report-api-ui
+          path: |
+            playwright-report/
+            artifacts/04-테스트수행결과.csv
+            artifacts/04-테스트수행결과-요약.md
+          retention-days: 30
+
+  # ── 2. 크로스 브라우저 (main 푸시 / 수동 실행 시에만) ─────────────────────
+  cross-browser:
+    name: 크로스 브라우저 (Firefox + WebKit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps firefox webkit
+      - run: npx playwright test --project=ui-firefox --project=ui-webkit
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: cross-browser-report
+          path: playwright-report/
+          retention-days: 14
+
+  # ── 3. 외부 공개 사이트 (실패해도 파이프라인을 막지 않음) ─────────────────
+  #     남의 서버가 죽었다고 우리 빌드가 빨개지면 안 된다.
+  #     대신 결과는 남겨서 "언제부터 깨졌는지" 추적할 수 있게 한다.
+  external:
+    name: 외부 데모 사이트 (참고용)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --project=external-api --project=external-ui
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: external-report
+          path: playwright-report/
+          retention-days: 14
+
+  # ── 4. Postman / Newman ───────────────────────────────────────────────────
+  #     이 컬렉션은 미수정 결함(BUG-001/006/008)을 그대로 재현하므로
+  #     실패 3건이 나오는 것이 정상이다. 결함이 수정되면 초록불로 바뀐다.
+  newman:
+    name: Postman 컬렉션 (Newman)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: SUT 기동
+        run: |
+          node sut/server.js &
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:4010/api/products > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://localhost:4010/api/products > /dev/null
+      - name: 컬렉션 실행
+        run: npm run newman
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: newman-report
+          path: reports/newman/
+          retention-days: 14

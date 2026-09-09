@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MiniShop</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: "Malgun Gothic", system-ui, sans-serif; margin: 0; background: #f5f6f8; color: #222; }
+  header { background: #2b3a55; color: #fff; padding: 14px 20px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 18px; margin: 0; }
+  header nav a { color: #cfd8e8; text-decoration: none; margin-right: 12px; font-size: 14px; }
+  header nav a:hover { color: #fff; }
+  #whoami { margin-left: auto; font-size: 13px; }
+  main { max-width: 900px; margin: 20px auto; padding: 0 16px; }
+  .card { background: #fff; border: 1px solid #e2e5ea; border-radius: 6px; padding: 16px; margin-bottom: 12px; }
+  label { display: block; font-size: 13px; margin: 8px 0 4px; color: #555; }
+  input[type=text], input[type=password], input[type=number] { padding: 7px 9px; border: 1px solid #c8ccd4; border-radius: 4px; font-size: 14px; }
+  button { padding: 7px 14px; border: 0; border-radius: 4px; background: #2b3a55; color: #fff; font-size: 14px; cursor: pointer; }
+  button.ghost { background: #fff; color: #2b3a55; border: 1px solid #2b3a55; }
+  button:disabled { background: #aaa; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { border-bottom: 1px solid #eceef2; padding: 9px 6px; text-align: left; }
+  th { background: #fafbfc; font-weight: 600; font-size: 13px; color: #555; }
+  .right { text-align: right; }
+  #message { padding: 10px 14px; border-radius: 4px; margin-bottom: 12px; font-size: 14px; display: none; }
+  #message.error { display: block; background: #fdecea; color: #b3261e; border: 1px solid #f5c2c0; }
+  #message.ok { display: block; background: #e8f5e9; color: #1b5e20; border: 1px solid #b7dfba; }
+  .total { font-size: 18px; font-weight: 700; }
+  .stock-out { color: #b3261e; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>MiniShop</h1>
+  <nav>
+    <a href="#/products" data-testid="nav-products">상품</a>
+    <a href="#/cart" data-testid="nav-cart">장바구니</a>
+    <a href="#/orders" data-testid="nav-orders">주문내역</a>
+  </nav>
+  <span id="whoami" data-testid="whoami"></span>
+</header>
+
+<main>
+  <div id="message" data-testid="message"></div>
+  <div id="view"></div>
+</main>
+
+<script>
+const API = '';
+let token = sessionStorage.getItem('token') || '';
+let email = sessionStorage.getItem('email') || '';
+
+const $ = (sel) => document.querySelector(sel);
+const won = (n) => Number(n).toLocaleString('ko-KR') + '원';
+
+function showMessage(text, type) {
+  const el = $('#message');
+  el.textContent = text;
+  el.className = type || 'error';
+}
+function clearMessage() {
+  const el = $('#message');
+  el.textContent = '';
+  el.className = '';
+}
+
+async function api(pathname, options) {
+  const opt = options || {};
+  const res = await fetch(API + pathname, {
+    method: opt.method || 'GET',
+    headers: Object.assign(
+      { 'Content-Type': 'application/json' },
+      token ? { Authorization: 'Bearer ' + token } : {}
+    ),
+    body: opt.body ? JSON.stringify(opt.body) : undefined,
+  });
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!res.ok) throw Object.assign(new Error((data && data.error && data.error.message) || '오류'), { status: res.status, data: data });
+  return data;
+}
+
+function renderHeader() {
+  $('#whoami').textContent = token ? email + ' (로그인)' : '비로그인';
+}
+
+// --------------------------------------------------------------------------
+// 로그인 화면
+// --------------------------------------------------------------------------
+function viewLogin() {
+  $('#view').innerHTML = `
+    <div class="card" style="max-width:360px">
+      <h2 style="margin-top:0;font-size:16px">로그인</h2>
+      <label for="email">이메일</label>
+      <input type="text" id="email" data-testid="input-email" style="width:100%" />
+      <label for="password">비밀번호</label>
+      <input type="password" id="password" data-testid="input-password" style="width:100%" />
+      <div style="margin-top:14px">
+        <button id="btn-login" data-testid="btn-login">로그인</button>
+      </div>
+    </div>`;
+  $('#btn-login').addEventListener('click', async () => {
+    clearMessage();
+    try {
+      const r = await api('/api/auth/login', { method: 'POST', body: { email: $('#email').value, password: $('#password').value } });
+      token = r.token; email = r.user.email;
+      sessionStorage.setItem('token', token);
+      sessionStorage.setItem('email', email);
+      renderHeader();
+      location.hash = '#/products';
+    } catch (e) {
+      showMessage(e.message, 'error');
+    }
+  });
+}
+
+// --------------------------------------------------------------------------
+// 상품 목록 화면
+// --------------------------------------------------------------------------
+async function viewProducts() {
+  $('#view').innerHTML = `
+    <div class="card">
+      <input type="text" id="keyword" data-testid="input-keyword" placeholder="상품명 검색" />
+      <button id="btn-search" data-testid="btn-search">검색</button>
+    </div>
+    <div class="card"><table>
+      <thead><tr><th>상품명</th><th class="right">가격</th><th class="right">재고</th><th style="width:170px">담기</th></tr></thead>
+      <tbody id="product-rows" data-testid="product-rows"></tbody>
+    </table></div>`;
+
+  $('#btn-search').addEventListener('click', () => loadProducts($('#keyword').value));
+  $('#keyword').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadProducts($('#keyword').value); });
+  await loadProducts('');
+}
+
+async function loadProducts(keyword) {
+  const qs = keyword ? '?size=50&keyword=' + encodeURIComponent(keyword) : '?size=50';
+  const data = await api('/api/products' + qs);
+  const rows = data.items.map((p) => `
+    <tr data-testid="product-row" data-product-id="${p.id}">
+      <td data-testid="product-name">${p.name}</td>
+      <td class="right" data-testid="product-price">${won(p.price)}</td>
+      <td class="right" data-testid="product-stock">${p.stock > 0 ? p.stock : '<span class="stock-out">품절</span>'}</td>
+      <td>
+        <input type="number" value="1" data-testid="input-qty" style="width:64px" />
+        <button class="ghost" data-testid="btn-add" data-product-id="${p.id}">담기</button>
+      </td>
+    </tr>`).join('');
+  // [SEED-15] UI-01 위반: 서버가 준 상품명을 이스케이프 없이 innerHTML로 삽입한다.
+  //           상품명에 <div> 같은 태그가 들어 있으면 태그로 해석되어 화면에서 사라지고,
+  //           <img onerror=...> 같은 값이 들어오면 저장형 XSS로 이어진다.
+  //           올바른 구현은 textContent를 쓰거나 <,>,& 를 이스케이프하는 것.
+  $('#product-rows').innerHTML = rows;
+
+  document.querySelectorAll('[data-testid="btn-add"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      clearMessage();
+      const tr = btn.closest('tr');
+      const qty = Number(tr.querySelector('[data-testid="input-qty"]').value);
+      try {
+        await api('/api/cart', { method: 'POST', body: { productId: Number(btn.dataset.productId), qty: qty } });
+        showMessage('장바구니에 담았습니다.', 'ok');
+      } catch (e) {
+        showMessage(e.message, 'error');
+      }
+    });
+  });
+}
+
+// --------------------------------------------------------------------------
+// 장바구니 화면
+// --------------------------------------------------------------------------
+async function viewCart() {
+  const data = await api('/api/cart');
+  const rows = data.items.map((i) => `
+    <tr data-testid="cart-row" data-item-id="${i.itemId}">
+      <td data-testid="cart-name">${i.name}</td>
+      <td class="right" data-testid="cart-price">${won(i.price)}</td>
+      <td class="right" data-testid="cart-qty">${i.qty}</td>
+      <td class="right" data-testid="cart-subtotal">${won(i.subtotal)}</td>
+      <td><button class="ghost" data-testid="btn-remove" data-item-id="${i.itemId}">삭제</button></td>
+    </tr>`).join('');
+
+  $('#view').innerHTML = `
+    <div class="card"><table>
+      <thead><tr><th>상품명</th><th class="right">가격</th><th class="right">수량</th><th class="right">소계</th><th></th></tr></thead>
+      <tbody data-testid="cart-rows">${rows || '<tr><td colspan="5" data-testid="cart-empty">장바구니가 비어 있습니다.</td></tr>'}</tbody>
+    </table></div>
+    <div class="card">
+      <div class="right total">총 결제 예정금액: <span data-testid="cart-total">${won(data.totalPrice)}</span></div>
+      <div style="margin-top:12px">
+        <input type="text" id="coupon" data-testid="input-coupon" placeholder="쿠폰 코드" />
+        <button id="btn-order" data-testid="btn-order">주문하기</button>
+      </div>
+    </div>`;
+
+  document.querySelectorAll('[data-testid="btn-remove"]').forEach((b) => {
+    b.addEventListener('click', async () => {
+      await api('/api/cart/' + b.dataset.itemId, { method: 'DELETE' });
+      viewCart();
+    });
+  });
+  $('#btn-order').addEventListener('click', async () => {
+    clearMessage();
+    const code = $('#coupon').value.trim();
+    try {
+      const r = await api('/api/orders', { method: 'POST', body: { couponCode: code || null } });
+      showMessage(`주문이 완료되었습니다. 주문번호 ${r.orderId} / 결제금액 ${won(r.finalPrice)}`, 'ok');
+      viewCart();
+    } catch (e) {
+      showMessage(e.message, 'error');
+    }
+  });
+}
+
+// --------------------------------------------------------------------------
+// 주문 내역 화면
+// --------------------------------------------------------------------------
+async function viewOrders() {
+  const list = await api('/api/orders');
+  const rows = list.map((o) => `
+    <tr data-testid="order-row">
+      <td data-testid="order-id">${o.orderId}</td>
+      <td class="right" data-testid="order-total">${won(o.totalPrice)}</td>
+      <td class="right" data-testid="order-discount">${won(o.discount)}</td>
+      <td class="right" data-testid="order-final">${won(o.finalPrice)}</td>
+    </tr>`).join('');
+  $('#view').innerHTML = `<div class="card"><table>
+      <thead><tr><th>주문번호</th><th class="right">주문금액</th><th class="right">할인</th><th class="right">결제금액</th></tr></thead>
+      <tbody data-testid="order-rows">${rows || '<tr><td colspan="4" data-testid="order-empty">주문 내역이 없습니다.</td></tr>'}</tbody>
+    </table></div>`;
+}
+
+// --------------------------------------------------------------------------
+// 라우터
+// --------------------------------------------------------------------------
+async function route() {
+  clearMessage();
+  renderHeader();
+  const hash = location.hash || '#/login';
+  try {
+    if (hash.startsWith('#/products')) return await viewProducts();
+    if (hash.startsWith('#/cart')) return await viewCart();
+    if (hash.startsWith('#/orders')) return await viewOrders();
+    return viewLogin();
+  } catch (e) {
+    if (e.status === 401) { location.hash = '#/login'; return viewLogin(); }
+    showMessage(e.message, 'error');
+  }
+}
+window.addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>

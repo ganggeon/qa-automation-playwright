@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    // 어떤 JS 버전 문법으로 변환할지. Node 22면 최신 문법 그대로 써도 됨
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+
+    // strict: 타입 검사 엄격 모드.
+    //   초보자에게는 "빨간 줄"이 많아 보이지만, 사실 이게 QA 자동화의 핵심 가치다.
+    //   page.click() 오타, undefined 접근 같은 실수를 "실행 전에" 잡아준다.
+    "strict": true,
+
+    // .ts 안에서 그냥 JS 객체 쓰는 것도 허용 (학습 초반 편의)
+    "allowJs": true,
+    "checkJs": false,
+
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+
+    // 컴파일 결과물을 만들지 않음. Playwright가 알아서 실행해준다.
+    "noEmit": true,
+
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@pages/*": ["pages/*"],
+      "@fixtures/*": ["fixtures/*"],
+      "@utils/*": ["utils/*"],
+      "@data/*": ["test-data/*"]
+    }
+  },
+  "include": ["tests/**/*.ts", "pages/**/*.ts", "fixtures/**/*.ts", "utils/**/*.ts", "test-data/**/*.ts", "playwright.config.ts"],
+  "exclude": ["node_modules", "sut"]
+}
