@@ -103,12 +103,12 @@ jobs:
 
   # ── 4. Postman / Newman ───────────────────────────────────────────────────
   #     이 컬렉션은 미수정 결함(BUG-001/006/008)을 그대로 재현하므로
-  #     실패 3건이 나오는 것이 정상이다. 결함이 수정되면 초록불로 바뀐다.
+  #     정확히 일치하는 알려진 실패만 별도 보고한다. 변경된 결과는 검토가 필요하다.
   newman:
     name: Postman 컬렉션 (Newman)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
+    # Unexpected failures must fail this job.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -116,16 +116,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: SUT 기동
-        run: |
-          node sut/server.js &
-          for i in $(seq 1 20); do
-            curl -sf http://localhost:4010/api/products > /dev/null && break
-            sleep 1
-          done
-          curl -sf http://localhost:4010/api/products > /dev/null
+      - name: 판정 로직 검증
+        run: node --test utils/newman-verdict.test.js
       - name: 컬렉션 실행
-        run: npm run newman
+        run: npm run newman:ci
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
