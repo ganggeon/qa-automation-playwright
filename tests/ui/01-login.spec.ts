@@ -33,7 +33,7 @@ test.describe('로그인 화면', () => {
     await loginPage.login(freshUser.email, 'WrongPw123');
 
     await expect(loginPage.message).toBeVisible();
-    await expect(loginPage.message).toHaveText('이메일 또는 비밀번호가 올바르지 않습니다.');
+    await expect(loginPage.message).toHaveText('S62 실습: 의도적으로 틀린 기대 문구');
     await expect(page, '실패 시 화면이 이동하면 안 된다').not.toHaveURL(/#\/products/);
   });
 
