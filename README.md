@@ -1,5 +1,7 @@
 # SW QA 학습 & 포트폴리오
 
+[![QA Test Suite — master](https://github.com/ganggeon/qa-automation-playwright/actions/workflows/qa.yml/badge.svg?branch=master)](https://github.com/ganggeon/qa-automation-playwright/actions/workflows/qa.yml?query=branch%3Amaster)
+
 테스트 설계 기법으로 케이스를 도출하고, API·UI 자동화로 검증하고,
 그 결과를 QA 산출물로 전달하는 전 과정을 담은 프로젝트입니다.
 
@@ -8,10 +10,17 @@
 | **테스트 수행** | 176건 (API 91 · UI 20×3브라우저 · 외부 24 · 초기화 1) |
 | **검출 결함** | 21건 (자체 SUT 16 + 외부 공개 API 5) |
 | **적용 기법** | 동등분할 · 경계값 분석 · 결정표 · 상태 전이 · 오류 추정 |
+| **기술 스택** | Playwright(TypeScript) · Postman/Newman · Ajv · GitHub Actions |
+| **실행 시간** | 2026-09-09 로컬 전체 약 50초 / 정상 Pass 139 · 알려진 실패 재현 37 · 예상 밖 실패 0 |
 
 저장소: https://github.com/ganggeon/qa-automation-playwright
-| **기술 스택** | Playwright(TypeScript) · Postman/Newman · Ajv · GitHub Actions |
-| **실행 시간** | 전체 약 50초(벽시계) / Fail 0 |
+
+**배지는 master의 CI 상태이며 제품 결함 해결이나 릴리스 승인을 뜻하지 않습니다.**
+Newman은 알려진 결함 BUG-001/006/008의 예상 재현을 별도 판정하고, 외부 사이트 Job은 실패를 허용합니다.
+PR에서는 Firefox·WebKit Job을 실행하지 않습니다. 검사 범위와 개별 결과는 각 Job의 Summary와 아티팩트를 확인하십시오.
+
+공개 준비된 [HTML 결과 스냅샷 소스](docs/site/index.html)는 2026-09-09 로컬 Playwright 실행 기록입니다.
+최신 CI 결과가 아니며 Pages 게시 주소는 게시 확인 후 추가합니다. [결과 분류와 공개 범위](docs/report-publishing.md)를 참고하십시오.
 
 ---
 
@@ -56,6 +65,8 @@ npm run report    # HTML 리포트 열기
 | `npm run test:crossbrowser` | Chromium + Firefox + WebKit |
 | `npm run test:external` | 외부 공개 사이트 (SauceDemo, restful-booker) |
 | `npm run test:headed` | 브라우저를 보면서 실행 |
+| `npm run newman:ci` | 새 메모리 서버에서 알려진 결함을 별도 판정하고 JSON/HTML·Job Summary 보존 |
+| `node utils/playwright-summary.js` | 기존 Playwright JSON에서 검사 범위와 판정별 요약 생성 (테스트 실행 없음) |
 | `npm run newman` | Postman 컬렉션 실행 + HTML 리포트 (⚠️ SUT를 초기화하므로 Playwright와 동시 실행 금지) |
 | `npm run typecheck` | 타입 검사 |
 | `node utils/report-to-csv.js` | 실행 결과 → QA 결과 보고서(CSV) 자동 변환 |
@@ -205,11 +216,12 @@ FR-06-4는 "장바구니에 이미 있는 수량과 합산한다 + 합산 결과
 | UI 표시 규칙 | 8 | 1 |
 | 결정표 | 6 | 0 (정상 경로 보증) |
 | 인증·인가 / 계약 검증 | 33 | 0 (회귀 안전망) |
-| **합계 (자체 SUT)** | **107** | **16** |
+| **합계 (과거 기법 분류표)** | **107** | **16** |
 
 > 마지막 행은 기법으로 도출한 케이스가 아니라 **정상 경로·인증 경로·스키마 계약**을
 > 지키는 회귀 안전망이다. 결함을 잡진 않지만, 결함을 고칠 때 다른 데가 깨지는 것을 막는다.
-> 합계 111 = API 91 + UI 20. (외부 24건과 초기화 1건은 별도)
+> 위 기법 분류표는 과거 107건 기준이며 현재 111건과의 분류 대응 갱신이 필요합니다.
+> 현재 자체 SUT 테스트는 111건 = API 91 + UI 20입니다. (외부 24건과 초기화 1건은 별도)
 
 ---
 
@@ -239,8 +251,9 @@ FR-06-4는 "장바구니에 이미 있는 수량과 합산한다 + 합산 결과
 - **동시성 테스트가 없다.** 마지막 재고 1개를 두 사용자가 동시에 주문하는 경우는 미검증이다
 - **성능 기준선이 없다.** 응답시간 상한만 확인하고 기준선 측정은 하지 않았다
 - 외부 UI 테스트(SauceDemo)가 정상 경로에 치우쳐 있다. `problem_user` 시나리오 확대가 필요하다
-- **CI(`.github/workflows/qa.yml`)를 실제로 가동해 본 적이 없다.** 로컬에서 설계·작성만 했고, 이 저장소에
-  올린 뒤 첫 실행에서 확인해야 할 부분이다. 미리 밝히지 않고 있다가 들키는 것보다는 낫다고 판단했다
+- **CI는 실제 실행 이력이 있습니다.** [2026-09-11 master 실행](https://github.com/ganggeon/qa-automation-playwright/actions/runs/34518537316)에서 4개 Job의 성공을 확인했습니다.
+  [PR의 의도적 UI 실패 실행](https://github.com/ganggeon/qa-automation-playwright/actions/runs/34520429488)에서 병합 차단을 확인했고,
+  [기대값 복구 실행](https://github.com/ganggeon/qa-automation-playwright/actions/runs/34520806519)도 성공했습니다. 이는 해당 실행의 기록이며 현재 상태는 배지와 실행 내역을 확인해야 합니다.
 - **자동 생성 문서와 손으로 쓴 문서의 노후화 속도가 다르다.** `artifacts/04`(자동 생성)는 재실행할 때마다
   갱신되지만, `artifacts/05`·이 README처럼 손으로 쓴 문서는 그대로 남아 수치가 벌어질 수 있다.
   실제로 이번 정비(168→176건) 전까지 그 간극이 존재했다

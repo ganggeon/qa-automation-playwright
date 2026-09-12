@@ -27,6 +27,9 @@ jobs:
       - name: 의존성 설치
         run: npm ci
 
+      - name: 결과 요약 분류 검증
+        run: node --test utils/playwright-summary.test.js
+
       - name: 타입 검사
         run: npm run typecheck
 
@@ -35,6 +38,10 @@ jobs:
 
       - name: 테스트 실행 (API + UI)
         run: npx playwright test --project=api --project=ui
+
+      - name: Playwright 실행 요약
+        if: ${{ !cancelled() }}
+        run: node utils/playwright-summary.js
 
       # 이 job은 api + ui 만 실행한다. 따라서 여기서 생성되는 결과 문서는
       # **부분 실행 결과**다. report-to-csv.js 가 문서 머리에 범위를 명시하고,
@@ -70,6 +77,10 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps firefox webkit
       - run: npx playwright test --project=ui-firefox --project=ui-webkit
+
+      - name: Playwright 실행 요약
+        if: ${{ !cancelled() }}
+        run: node utils/playwright-summary.js
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -94,6 +105,10 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test --project=external-api --project=external-ui
+
+      - name: Playwright 실행 요약
+        if: ${{ !cancelled() }}
+        run: node utils/playwright-summary.js
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
