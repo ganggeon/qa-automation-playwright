@@ -19,8 +19,10 @@
 Newman은 알려진 결함 BUG-001/006/008의 예상 재현을 별도 판정하고, 외부 사이트 Job은 실패를 허용합니다.
 PR에서는 Firefox·WebKit Job을 실행하지 않습니다. 검사 범위와 개별 결과는 각 Job의 Summary와 아티팩트를 확인하십시오.
 
-공개 준비된 [HTML 결과 스냅샷 소스](docs/site/index.html)는 2026-09-09 로컬 Playwright 실행 기록입니다.
-최신 CI 결과가 아니며 Pages 게시 주소는 게시 확인 후 추가합니다. [결과 분류와 공개 범위](docs/report-publishing.md)를 참고하십시오.
+**[공개 HTML 테스트 리포트 보기](https://ganggeon.github.io/qa-automation-playwright/)**
+
+2026-09-09 로컬 Playwright 실행 기록의 정적 스냅샷이며 최신 CI 결과가 아닙니다.
+[HTML 소스](docs/site/index.html)와 [결과 분류·공개 범위](docs/report-publishing.md)를 참고하십시오.
 
 ---
 
