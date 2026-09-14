@@ -92,8 +92,8 @@ expect(after).toBe(before - 2);                        // ⑤ 부수 효과
 값만 비교하면 **계약 변화**를 놓친다.
 
 ```ts
-expect(body.id).toBe(1);   // id가 number → string 으로 바뀌어도 못 잡는다 (== 비교 아님이라 잡히긴 하나)
-                           // 새 필드가 추가되거나 필드가 사라지는 건 전혀 못 잡는다
+expect(body.id).toBe(1);   // id 하나만 본다 — id의 타입 변경("1")이나 누락은 잡지만
+                           // 새 필드가 추가되거나 다른 필드가 사라지는 건 못 잡는다
 ```
 
 JSON Schema로 응답의 **모양 전체**를 검사한다.
@@ -116,14 +116,14 @@ export const signupSchema = {
 스키마에 비즈니스 규칙도 넣을 수 있다.
 
 ```ts
-stock:      { type: 'integer', minimum: 0 },   // 재고는 음수 불가 → BUG-014 검출
-totalPrice: { type: 'integer', minimum: 0 },   // 총액은 음수 불가 → BUG-008 검출
-finalPrice: { type: 'integer', minimum: 0 },   // 결제금액은 음수 불가 → BUG-013 검출
-discount:   { type: 'integer' },               // 정수 → 소수점 잔여 검출 → BUG-012
+stock:      { type: 'integer', minimum: 0 },   // 재고는 음수 불가
+totalPrice: { type: 'integer', minimum: 0 },   // 총액은 음수 불가 → BUG-008(음수 수량 담기) 검출
+finalPrice: { type: 'integer', minimum: 0 },   // 결제금액은 음수 불가
+discount:   { type: 'integer' },               // 정수만 허용 → 소수점이 남은 응답은 스키마 검증 실패
 ```
 
-> 이 프로젝트에서 **스키마 하나로 결함 4건이 자동으로 걸렸다.**
-> 개별 단언을 다 안 써도 잡힌다는 게 스키마 검증의 힘이다.
+> 이 프로젝트에서 스키마 검증으로 드러난 결함은 **BUG-008 1건**이다(TC-API-CART-006의 장바구니 응답 검증).
+> 개별 단언으로 일일이 쓰지 않은 범위 규칙까지 한 번에 검사한다는 게 스키마 검증의 장점이다.
 
 ---
 
