@@ -2,7 +2,9 @@
 
 [![QA Test Suite — master](https://github.com/ganggeon/qa-automation-playwright/actions/workflows/qa.yml/badge.svg?branch=master)](https://github.com/ganggeon/qa-automation-playwright/actions/workflows/qa.yml?query=branch%3Amaster)
 
-> 이 저장소는 AI 튜터(Claude·Codex)의 안내로 진행한 1인 QA 학습 프로젝트입니다. 테스트 대상(MiniShop)과 요구사항 명세, `artifacts/`의 참고 산출물, 학습 문서, 자동화 스위트 대부분은 AI가 학습 환경으로 구성했고, CI 보조 스크립트는 Codex가 구현했습니다. 저는 이 환경에서 테스트 조건 도출, 결함 리포트 작성, Postman 컬렉션 구성, 일부 테스트 코드 추가, GitHub Pages 게시 등을 실습했습니다. 테스트·결함 수치는 학습 환경 전체의 결과입니다.
+> 이 저장소는 1인 QA 학습 프로젝트입니다. **제가 도출한 테스트 조건 50건(제공된 예시 3줄을 합쳐 문서에는 53건)과 작성한 결함 리포트 BUG-013, 구성한 Postman 컬렉션은 [`portfolio-submissions/`](portfolio-submissions/)에 모아 두었습니다.** 그 밖에 기존 자동화 테스트에 케이스 2건(`TC-API-SIGNUP-024`·`TC-API-CART-021`)을 추가하고, codegen 녹화본에 담김 여부 단언을 보완했으며, GitHub Pages 게시를 실습했습니다.
+>
+> AI 튜터(Claude·Codex)는 테스트 대상(MiniShop)과 요구사항 명세, `artifacts/`의 참고 산출물, 학습 문서, 자동화 스위트 대부분을 학습 환경으로 구성했고, CI 보조 스크립트는 Codex가 구현했습니다. 이 README의 **테스트·결함 수치는 학습 환경 전체의 결과**입니다.
 
 테스트 설계 기법으로 케이스를 도출하고, API·UI 자동화로 검증하고,
 그 결과를 QA 산출물로 전달하는 전 과정을 담은 프로젝트입니다.
@@ -79,7 +81,21 @@ npm run report    # HTML 리포트 열기
 
 ## 무엇을 보면 되는가
 
-### 📋 QA 산출물 — 실무 문서 역량
+### 🙋 지원자가 작성·구성한 산출물과 코드 기여 — `portfolio-submissions/`
+
+| 산출물 | 내용 | 확인 포인트 |
+|---|---|---|
+| [테스트 조건 53건](portfolio-submissions/01-테스트조건-53건.md) | 명세만 보고 도출한 뒤 참고 답안과 대조해 보완. 리스크 등급 High 20 · Medium 27 · Low 6. **TC-03~05는 제공된 예시**라 본인 도출분은 50건 | 요구사항과 테스트 조건의 연결 |
+| [결함 리포트 BUG-013](portfolio-submissions/02-결함리포트-BUG-013.md) | 음수 결제금액(-47,655원). 재현 절차 · 기대/실제 · 확인 범위 · 잠재 영향 · 심각도/우선순위 근거 | 확인한 것과 확인하지 않은 것의 구분 |
+| [Postman 컬렉션](portfolio-submissions/postman/) | 로그인 → 담기 → 주문 흐름 + 인증 없는 요청(401). 요청 4 · 단언 9 | 컬렉션 구성과 401 케이스 추가가 본인 작업이며, 단언 코드 자체는 제공 예시를 활용 |
+| 기존 자동화 테스트에 케이스 2건 추가 | [`TC-API-SIGNUP-024`](tests/api/01-signup.spec.ts#L162) · [`TC-API-CART-021`](tests/api/04-cart.spec.ts#L120) | SIGNUP-024는 추가한 뒤 기존 데이터 주도 배열로 옮겨 공통 단언이 함께 적용되게 함. CART-021은 값 선택을 교정받아 완성 |
+
+> 작성 경위와 「틀렸다가 고친 것」은 [portfolio-submissions/README.md](portfolio-submissions/README.md)에 적혀 있습니다.
+> AI가 구성한 학습 환경과 본인 기여의 구분은 맨 위 설명을 참고하십시오.
+
+### 📋 참고 산출물 (`artifacts/`) — AI 튜터 작성, 대조용
+
+> 아래 6건은 AI 튜터가 작성한 참고 산출물이며, 본인 산출물과 대조하기 위한 자료입니다.
 
 | 문서 | 내용 |
 |---|---|

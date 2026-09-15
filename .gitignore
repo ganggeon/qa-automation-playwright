@@ -19,3 +19,12 @@ my-work/
 # 에디터
 .vscode/
 .idea/
+
+# 문서 작업용 일회용 스크립트 — 저장소와 무관 (2026-09-15)
+/h.json
+/h3-tmp.js
+/heights-tmp.js
+/make-pdf-tmp.js
+
+# 로컬 도구 설정
+/.codex/
