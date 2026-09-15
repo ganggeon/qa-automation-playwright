@@ -24,6 +24,17 @@ if (!fs.existsSync(INPUT)) {
 
 const report = JSON.parse(fs.readFileSync(INPUT, 'utf8'));
 
+// 이 문서가 "언제 만들어졌나" 와 "어느 실행의 결과인가" 는 다른 값이다.
+// 생성 시각만 찍으면 낡은 results.json 으로 만든 문서를 구분할 수 없다.
+const runStartedAt = Number.isFinite(Date.parse(report.stats?.startTime))
+  ? new Date(report.stats.startTime).toISOString()
+  : '미기록 (원본 JSON에 stats.startTime 없음)';
+
+// 외부 공개 API(restful-booker)에서 나온 EXT-BUG-001~004 는 상태코드 관례 위반과
+// 입력 검증 개선 제안이지 제품 결함이 아니다(artifacts/03-결함리포트.md C절 「외부 API — 참고용」).
+// 한 숫자로 합치면 "결함 20건"이 되어 실제보다 크게 읽힌다.
+const SUGGESTION_IDS = new Set(['EXT-BUG-001', 'EXT-BUG-002', 'EXT-BUG-003', 'EXT-BUG-004']);
+
 /** 중첩된 suite 구조를 평탄하게 펼친다 */
 function collectSpecs(suite, acc = []) {
   for (const child of suite.suites ?? []) collectSpecs(child, acc);
@@ -91,7 +102,12 @@ fs.writeFileSync(OUT_CSV, '﻿' + csv, 'utf8');
 
 // ── 요약 ───────────────────────────────────────────────────────────────────
 const count = (v) => rows.filter((r) => r.verdict === v).length;
-const bugs = [...new Set(rows.map((r) => r.bugId).filter(Boolean))].sort();
+// 재현된 행만 센다. annotation 에서 ID 만 뽑으면 Skip 되었거나 예상 밖으로 통과한
+// 테스트의 ID 까지 '재현됨' 에 들어가 실제보다 많이 세어진다.
+const reproduced = rows.filter((r) => r.verdict === '결함확인');
+const bugs = [...new Set(reproduced.map((r) => r.bugId).filter(Boolean))].sort();
+const defectIds = bugs.filter((b) => !SUGGESTION_IDS.has(b));
+const suggestionIds = bugs.filter((b) => SUGGESTION_IDS.has(b));
 const byProject = {};
 for (const r of rows) {
   byProject[r.project] ??= { total: 0, pass: 0, defect: 0, fail: 0 };
@@ -131,17 +147,18 @@ const md = `# 테스트 수행 결과 요약 (자동 생성)
 |---|---:|
 | 총 테스트케이스 | ${rows.length} |
 | Pass (정상 동작 확인) | ${count('Pass')} |
-| 결함확인 (알려진 결함 재현) | ${count('결함확인')} |
+| 알려진 실패 재현 (결함 + 관례 위반·개선 제안) | ${count('결함확인')} |
 | Fail (미해결/예상 밖 실패) | ${count('Fail')} |
 | Flaky | ${count('Flaky')} |
 | Skip | ${count('Skip')} |
-| 검출 결함 수 | ${bugs.length} |
+| 재현된 결함 수 | ${defectIds.length} |
+| 재현된 관례 위반·개선 제안 (외부 공개 API) | ${suggestionIds.length} |
 | 실제 소요 시간 (벽시계) | ${(wallMs / 1000).toFixed(1)}초 |
 | 테스트 소요 시간 합계 | ${(totalMs / 1000).toFixed(1)}초 (병렬 실행이라 벽시계보다 큼) |
 
 ## 대상별
 
-| 대상 | 총계 | Pass | 결함확인 | Fail |
+| 대상 | 총계 | Pass | 알려진 실패 재현 | Fail |
 |---|---:|---:|---:|---:|
 ${Object.entries(byProject)
   .map(([k, v]) => `| ${k} | ${v.total} | ${v.pass} | ${v.defect} | ${v.fail} |`)
@@ -149,15 +166,22 @@ ${Object.entries(byProject)
 
 ## 검출된 결함
 
-${bugs.length === 0 ? '_없음_' : bugs.map((b) => `- **${b}** — ${rows.filter((r) => r.bugId === b).length}건의 테스트케이스에서 검출`).join('\n')}
+${defectIds.length === 0 ? '_없음_' : defectIds.map((b) => `- **${b}** — ${reproduced.filter((r) => r.bugId === b).length}건의 테스트케이스에서 재현`).join('\n')}
+
+## 관례 위반·개선 제안 (외부 공개 API · 결함과 따로 센다)
+
+${suggestionIds.length === 0 ? '_없음_' : suggestionIds.map((b) => `- **${b}** — ${reproduced.filter((r) => r.bugId === b).length}건의 테스트케이스에서 확인`).join('\n')}
 
 ---
-_생성 시각: ${new Date().toISOString()}_
+_실행 시작 시각(이 문서의 근거가 된 실행): ${runStartedAt}_
+
+_문서 생성 시각: ${new Date().toISOString()}_
 `;
 
 fs.writeFileSync(OUT_MD, md, 'utf8');
 
 console.log(`총 ${rows.length}건  |  Pass ${count('Pass')}  결함확인 ${count('결함확인')}  Fail ${count('Fail')}`);
-console.log(`검출 결함 ${bugs.length}건: ${bugs.join(', ')}`);
+console.log(`재현된 결함 ${defectIds.length}건: ${defectIds.join(', ')}`);
+console.log(`관례 위반·개선 제안 ${suggestionIds.length}건: ${suggestionIds.join(', ')}`);
 console.log(`→ ${path.relative(ROOT, OUT_CSV)}`);
 console.log(`→ ${path.relative(ROOT, OUT_MD)}`);
