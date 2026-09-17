@@ -10,12 +10,6 @@ import type { Page, Locator } from '@playwright/test';
  * 규칙 하나만 지키면 된다:
  *   **페이지 객체는 검증(expect)하지 않는다.** 검증은 테스트가 한다.
  *   페이지 객체는 "무엇을 할 수 있는가"와 "무엇이 보이는가"만 제공한다.
- *
- * [TypeScript 메모]
- *   `protected readonly page: Page`
- *     protected = 자식 클래스에서만 접근 가능
- *     readonly   = 한 번 대입하면 못 바꿈
- *   생성자 매개변수에 이 키워드를 붙이면 `this.page = page` 를 자동으로 해준다.
  */
 export abstract class BasePage {
   constructor(protected readonly page: Page) {}

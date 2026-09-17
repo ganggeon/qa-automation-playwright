@@ -3,11 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Playwright 설정
  *
- * [TypeScript 초보자를 위한 메모]
- *  - `import { X } from 'y'`  : y 모듈에서 X만 꺼내 쓴다. JS의 require와 같은 역할.
- *  - `defineConfig({...})`    : 그냥 함수 호출이다. 이걸 감싸는 이유는 에디터가
- *                               설정 객체의 필드명을 자동완성/오타검사 해주기 때문.
- *                               즉 "설정 파일에 대한 테스트"를 타입이 대신 해준다.
+ * `defineConfig` 로 감싸 설정 필드명의 오타를 타입 검사 단계에서 잡는다.
  */
 
 const SUT_PORT = 4010;

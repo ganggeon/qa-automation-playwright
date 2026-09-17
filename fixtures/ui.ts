@@ -8,12 +8,12 @@ import { OrdersPage } from '../pages/OrdersPage';
  * UI 테스트용 픽스처
  *
  * minishop 픽스처(freshUser/token/shop)를 그대로 물려받고 페이지 객체를 추가한다.
- * 픽스처는 이렇게 겹겹이 쌓을 수 있다.
+ * minishop의 테스트별 계정 격리를 UI 테스트에서도 그대로 재사용한다.
  *
  * `loggedIn` 픽스처는 **UI로 실제 로그인**한다.
  *   API로 토큰만 심어넣으면 빠르지만, 그러면 로그인 화면은 아무도 안 밟는다.
- *   여기서는 학습 목적상 실제 로그인 경로를 쓴다.
- *   (실무에서는 storageState 재사용으로 로그인을 1회만 하는 최적화를 쓴다)
+ *   여기서는 로그인 화면도 매번 거치도록 실제 로그인 경로를 쓴다.
+ *   (테스트 수가 늘어 실행 시간이 문제가 되면 storageState 재사용으로 전환한다)
  */
 type UiFixtures = {
   loginPage: LoginPage;

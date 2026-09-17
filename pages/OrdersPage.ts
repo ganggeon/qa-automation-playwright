@@ -15,11 +15,8 @@ import { BasePage } from './BasePage';
  *   Playwright 가 조건이 맞을 때까지 다시 확인한다.
  *   → **기본은 `cell()`(Locator), 숫자 계산이 꼭 필요할 때만 `cellAmount()`.**
  *
- * [TypeScript 메모]
- *   `cell: OrderCell` 의 `OrderCell` 은 **유니온 타입**이다(아래 정의).
- *   'id' | 'total' | 'discount' | 'final' 네 글자만 허용하겠다는 뜻이고,
- *   오타를 내면 실행 전에 에디터가 잡아준다. BasePage 의
- *   `navigate(to: 'products' | 'cart' | 'orders')` 와 같은 방식이다.
+ * 열 이름은 유니온 타입(`OrderCell`)으로 제한해, 없는 열 이름을 쓰면
+ * 실행 전에 타입 검사에서 걸리게 한다.
  */
 
 /** 주문내역 표의 열 이름. `data-testid="order-<이름>"` 과 1:1로 맞춰 둔다. */
