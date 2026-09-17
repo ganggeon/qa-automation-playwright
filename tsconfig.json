@@ -6,11 +6,10 @@
     "moduleResolution": "node",
 
     // strict: 타입 검사 엄격 모드.
-    //   초보자에게는 "빨간 줄"이 많아 보이지만, 사실 이게 QA 자동화의 핵심 가치다.
     //   page.click() 오타, undefined 접근 같은 실수를 "실행 전에" 잡아준다.
     "strict": true,
 
-    // .ts 안에서 그냥 JS 객체 쓰는 것도 허용 (학습 초반 편의)
+    // TS에서 JS 파일 import 허용(현재 사용처 없음). JS는 타입 검사하지 않는다(checkJs: false)
     "allowJs": true,
     "checkJs": false,
 

@@ -10,9 +10,8 @@ import { expect } from '@playwright/test';
  *   필드가 사라지거나, 타입이 number -> string 으로 바뀌거나, null이 들어오는 사고는
  *   "값 비교"로는 잘 안 잡힌다. 스키마 검증은 응답의 '모양'을 통째로 검사한다.
  *
- * [TypeScript 메모]
- *   `data: unknown` 은 "뭐가 올지 모른다"는 뜻이다. `any`와 달리 그냥 쓸 수 없고
- *   검사한 뒤에야 쓸 수 있다. 외부에서 받은 데이터에는 unknown이 정답이다.
+ * 응답은 `unknown` 으로 받는다. 검증 전에는 필드에 접근할 수 없게 해서
+ * 검사하지 않은 값을 그대로 믿는 실수를 막는다.
  */
 
 const ajv = new Ajv({ allErrors: true, strict: false });

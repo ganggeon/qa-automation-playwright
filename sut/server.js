@@ -284,7 +284,7 @@ app.post('/api/orders', auth, (req, res) => {
     discount = c.type === 'RATE' ? (view.totalPrice * c.value) / 100 : c.value;
   }
 
-  // [S47 수정] FR-09-5 는 결제금액(finalPrice)의 0원 하한을 규정한다 → Math.max(0, ...).
+  // [수정] FR-09-5 는 결제금액(finalPrice)의 0원 하한을 규정한다 → Math.max(0, ...).
   //           할인액(discount)을 주문금액까지로 깎는 것은 명세 요구가 아니라 이 구현의 선택이다.
   //           명세 확인 항목으로 올렸다 → portfolio-submissions/04-명세검토-추가.md (SPEC-DEF-007)
   discount = Math.min(discount, view.totalPrice);

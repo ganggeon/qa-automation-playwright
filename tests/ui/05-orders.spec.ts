@@ -2,19 +2,17 @@ import { test, expect } from '../../fixtures/ui';
 import { PRODUCT } from '../../test-data/minishop';
 
 /**
- * S40 — `OrdersPage` 를 쓰는 E2E 테스트 1건
+ * 주문내역 E2E — `OrdersPage` 를 쓰는 테스트 1건
  *
  * 담기 → 주문 → **주문내역에 제대로 쌓였는가**까지가 한 건의 흐름이다.
  * 03-checkout.spec.ts 의 E2E-001 은 주문내역을 `page.getByTestId('order-row')` 로
  * 직접 뒤졌다(테스트 안에 셀렉터가 박혀 있다). 여기서는 그 부분을 전부
  * `OrdersPage` 에 맡긴다 — 화면이 바뀌면 고칠 곳이 페이지 객체 한 군데다.
  *
- * ⚠ 원래 이 파일에는 `new OrdersPage(page)` 가 손으로 박혀 있었다.
- *    ✅ S42 에서 실제로 지웠다 — 이제 `ordersPage` 를 픽스처 인자로 받는다.
- *    `fixtures/ui.ts` 에 3줄(import / type / extend)을 넣은 것이 전부다.
+ * `ordersPage` 는 `fixtures/ui.ts` 픽스처에서 받는다(테스트 안에서 직접 생성하지 않음).
  */
 
-test.describe('주문내역 화면 (S40)', () => {
+test.describe('주문내역 화면', () => {
   test.beforeEach(async ({ loggedIn }) => {});
 
   test('TC-UI-E2E-004 | 주문하면 주문내역 맨 위에 금액이 그대로 쌓인다', async ({
