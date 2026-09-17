@@ -28,3 +28,11 @@ my-work/
 
 # 로컬 도구 설정
 /.codex/
+
+# 문서 작업용 일회용 스크립트 (2026-09-17)
+/_mkpdf_tmp.js
+/_shot_tmp.js
+
+# 초기 개념 노트·CI/CD 계획서 — archive/learning-2026-08 브랜치에 보관, 로컬 학습용으로만 유지 (2026-09-17)
+/docs/0[0-8]-*.md
+/docs/10-CICD-계획.md

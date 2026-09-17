@@ -116,9 +116,13 @@ test.describe('FR-09 주문 - 금액 계산 경계', () => {
     expect(body.finalPrice, `결제금액이 음수: ${body.finalPrice}`).toBeGreaterThanOrEqual(0);
     expect(body.finalPrice).toBe(0);
 
-    // S47: 화면(finalPrice)만 막고 discount 를 그대로 두면 정산 집계가 틀린다.
-    // 리포트의 「기대 결과」 표에 있던 칸이므로 확인 테스트도 이 칸을 덮어야 한다.
-    expect(body.discount, `할인액이 주문금액을 초과: ${body.discount}`).toBe(2345);
+    // discount 는 단언하지 않는다.
+    // FR-09-5 가 규정하는 것은 finalPrice 의 0원 하한까지다. 응답으로 돌아오는
+    // discount 필드를 총액까지로 제한하라는 요구는 명세에 없다.
+    // 2026-09-16 이전에는 여기에 `expect(body.discount).toBe(2345)` 가 있었으나,
+    // 그 기대값의 출처는 명세가 아니라 AI 참고 산출물(artifacts/03-결함리포트.md)이었다.
+    // discount 의 의미와 총액 초과 시 처리 규칙은 명세 확인 항목으로 올렸다.
+    // → portfolio-submissions/04-명세검토-추가.md (SPEC-DEF-007)
   });
 });
 
