@@ -35,6 +35,13 @@ const runStartedAt = Number.isFinite(Date.parse(report.stats?.startTime))
 // 한 숫자로 합치면 "결함 20건"이 되어 실제보다 크게 읽힌다.
 const SUGGESTION_IDS = new Set(['EXT-BUG-001', 'EXT-BUG-002', 'EXT-BUG-003', 'EXT-BUG-004']);
 
+// 기대 실패(test.fail)는 두 가지로 나눈다.
+//   결함 재현 확인        : 테스트가 알려진 증상을 직접 확인하고 symptom-confirmed 표시를 남긴 경우
+//   기대 실패—원인 미확인 : test.fail()대로 실패했지만, 그 실패가 해당 결함 때문인지 확인하지 않은 경우
+// test.fail()은 실패 원인을 보지 않으므로, 준비 단계가 깨져도 기대 실패로 기록된다.
+const CONFIRMED = '결함 재현 확인';
+const UNCONFIRMED = '기대 실패—원인 미확인';
+
 /** 중첩된 suite 구조를 평탄하게 펼친다 */
 function collectSpecs(suite, acc = []) {
   for (const child of suite.suites ?? []) collectSpecs(child, acc);
@@ -62,12 +69,14 @@ for (const spec of specs) {
     const failAnnotation = (t.annotations ?? []).find((a) => a.type === 'fail');
     const knownBug = failAnnotation?.description ?? '';
     const bugId = (knownBug.match(/((?:EXT-)?BUG-\d+)/) ?? [])[1] ?? '';
+    const symptomConfirmed = [...(t.annotations ?? []), ...(result.annotations ?? [])]
+      .some((a) => a.type === 'symptom-confirmed');
 
     // Playwright 판정
     //   expected  : 기대대로 (통과 또는 "실패할 것으로 표시된 테스트가 실패")
     //   unexpected: 기대와 다름 (진짜 실패)
     let verdict;
-    if (t.status === 'expected' && failAnnotation) verdict = '결함확인'; // 알려진 결함 재현됨
+    if (t.status === 'expected' && failAnnotation) verdict = symptomConfirmed ? CONFIRMED : UNCONFIRMED;
     else if (t.status === 'expected') verdict = 'Pass';
     else if (t.status === 'skipped') verdict = 'Skip';
     else if (t.status === 'flaky') verdict = 'Flaky';
@@ -102,19 +111,26 @@ fs.writeFileSync(OUT_CSV, '﻿' + csv, 'utf8');
 
 // ── 요약 ───────────────────────────────────────────────────────────────────
 const count = (v) => rows.filter((r) => r.verdict === v).length;
-// 재현된 행만 센다. annotation 에서 ID 만 뽑으면 Skip 되었거나 예상 밖으로 통과한
-// 테스트의 ID 까지 '재현됨' 에 들어가 실제보다 많이 세어진다.
-const reproduced = rows.filter((r) => r.verdict === '결함확인');
-const bugs = [...new Set(reproduced.map((r) => r.bugId).filter(Boolean))].sort();
+// 기대 실패한 행만 센다. annotation 에서 ID 만 뽑으면 Skip 되었거나 예상 밖으로 통과한
+// 테스트의 ID 까지 들어가 실제보다 많이 세어진다.
+const expectedFailures = rows.filter((r) => r.verdict === CONFIRMED || r.verdict === UNCONFIRMED);
+const bugs = [...new Set(expectedFailures.map((r) => r.bugId).filter(Boolean))].sort();
 const defectIds = bugs.filter((b) => !SUGGESTION_IDS.has(b));
 const suggestionIds = bugs.filter((b) => SUGGESTION_IDS.has(b));
 const byProject = {};
 for (const r of rows) {
-  byProject[r.project] ??= { total: 0, pass: 0, defect: 0, fail: 0 };
+  byProject[r.project] ??= { total: 0, pass: 0, confirmed: 0, unconfirmed: 0, fail: 0 };
   byProject[r.project].total++;
   if (r.verdict === 'Pass') byProject[r.project].pass++;
-  if (r.verdict === '결함확인') byProject[r.project].defect++;
+  if (r.verdict === CONFIRMED) byProject[r.project].confirmed++;
+  if (r.verdict === UNCONFIRMED) byProject[r.project].unconfirmed++;
   if (r.verdict === 'Fail') byProject[r.project].fail++;
+}
+
+/** 결함 ID별로 기대 실패 건수와 그중 증상을 직접 확인한 건수를 나눠 적는다 */
+function breakdown(b) {
+  const of = (v) => expectedFailures.filter((r) => r.bugId === b && r.verdict === v).length;
+  return `- **${b}** — 기대 실패 ${of(CONFIRMED) + of(UNCONFIRMED)}건 (결함 재현 확인 ${of(CONFIRMED)}건 · 원인 미확인 ${of(UNCONFIRMED)}건)`;
 }
 
 const totalMs = rows.reduce((s, r) => s + r.ms, 0);
@@ -147,30 +163,31 @@ const md = `# 테스트 수행 결과 요약 (자동 생성)
 |---|---:|
 | 총 테스트케이스 | ${rows.length} |
 | Pass (정상 동작 확인) | ${count('Pass')} |
-| 알려진 실패 재현 (결함 + 관례 위반·개선 제안) | ${count('결함확인')} |
+| 결함 재현 확인 (테스트가 증상을 직접 확인) | ${count(CONFIRMED)} |
+| 기대 실패—원인 미확인 (결함 + 관례 위반·개선 제안) | ${count(UNCONFIRMED)} |
 | Fail (미해결/예상 밖 실패) | ${count('Fail')} |
 | Flaky | ${count('Flaky')} |
 | Skip | ${count('Skip')} |
-| 재현된 결함 수 | ${defectIds.length} |
-| 재현된 관례 위반·개선 제안 (외부 공개 API) | ${suggestionIds.length} |
+| 기대 실패가 나온 결함 수 | ${defectIds.length} |
+| 기대 실패가 나온 관례 위반·개선 제안 (외부 공개 API) | ${suggestionIds.length} |
 | 실제 소요 시간 (벽시계) | ${(wallMs / 1000).toFixed(1)}초 |
 | 테스트 소요 시간 합계 | ${(totalMs / 1000).toFixed(1)}초 (병렬 실행이라 벽시계보다 큼) |
 
 ## 대상별
 
-| 대상 | 총계 | Pass | 알려진 실패 재현 | Fail |
-|---|---:|---:|---:|---:|
+| 대상 | 총계 | Pass | 결함 재현 확인 | 원인 미확인 | Fail |
+|---|---:|---:|---:|---:|---:|
 ${Object.entries(byProject)
-  .map(([k, v]) => `| ${k} | ${v.total} | ${v.pass} | ${v.defect} | ${v.fail} |`)
+  .map(([k, v]) => `| ${k} | ${v.total} | ${v.pass} | ${v.confirmed} | ${v.unconfirmed} | ${v.fail} |`)
   .join('\n')}
 
-## 검출된 결함
+## 기대 실패가 나온 결함
 
-${defectIds.length === 0 ? '_없음_' : defectIds.map((b) => `- **${b}** — ${reproduced.filter((r) => r.bugId === b).length}건의 테스트케이스에서 재현`).join('\n')}
+${defectIds.length === 0 ? '_없음_' : defectIds.map(breakdown).join('\n')}
 
 ## 관례 위반·개선 제안 (외부 공개 API · 결함과 따로 센다)
 
-${suggestionIds.length === 0 ? '_없음_' : suggestionIds.map((b) => `- **${b}** — ${reproduced.filter((r) => r.bugId === b).length}건의 테스트케이스에서 확인`).join('\n')}
+${suggestionIds.length === 0 ? '_없음_' : suggestionIds.map(breakdown).join('\n')}
 
 ---
 _실행 시작 시각(이 문서의 근거가 된 실행): ${runStartedAt}_
@@ -180,8 +197,8 @@ _문서 생성 시각: ${new Date().toISOString()}_
 
 fs.writeFileSync(OUT_MD, md, 'utf8');
 
-console.log(`총 ${rows.length}건  |  Pass ${count('Pass')}  결함확인 ${count('결함확인')}  Fail ${count('Fail')}`);
-console.log(`재현된 결함 ${defectIds.length}건: ${defectIds.join(', ')}`);
+console.log(`총 ${rows.length}건  |  Pass ${count('Pass')}  결함 재현 확인 ${count(CONFIRMED)}  원인 미확인 ${count(UNCONFIRMED)}  Fail ${count('Fail')}`);
+console.log(`기대 실패가 나온 결함 ${defectIds.length}건: ${defectIds.join(', ')}`);
 console.log(`관례 위반·개선 제안 ${suggestionIds.length}건: ${suggestionIds.join(', ')}`);
 console.log(`→ ${path.relative(ROOT, OUT_CSV)}`);
 console.log(`→ ${path.relative(ROOT, OUT_MD)}`);

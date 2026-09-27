@@ -2,8 +2,15 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const PROJECTS = ['setup', 'api', 'ui', 'ui-firefox', 'ui-webkit', 'external-api', 'external-ui'];
-const LABELS = ['Pass', '알려진 실패 재현', '예상 밖 결과', 'Flaky', 'Skip'];
+// The main suite and the rebuilt login suite run with separate configs; one report holds only one of them.
+const SUITES = {
+  main: ['setup', 'api', 'ui', 'ui-firefox', 'ui-webkit', 'external-api', 'external-ui'],
+  rebuilt: ['rebuilt-api', 'rebuilt-ui'],
+};
+const PROJECTS = Object.values(SUITES).flat();
+const CONFIRMED = '결함 재현 확인';
+const UNCONFIRMED = '기대 실패—원인 미확인';
+const LABELS = ['Pass', CONFIRMED, UNCONFIRMED, '예상 밖 결과', 'Flaky', 'Skip'];
 function summarize(report) {
   if (!Array.isArray(report.suites) || !report.stats || !Array.isArray(report.errors)) throw new Error('Playwright 리포트 구조가 올바르지 않습니다.');
   const rows = [];
@@ -16,7 +23,11 @@ function summarize(report) {
       if (test.status === 'skipped') verdict = 'Skip';
       else if (test.status === 'flaky') verdict = 'Flaky';
       else if (test.status === 'unexpected') verdict = '예상 밖 결과';
-      else if (test.expectedStatus === 'failed' && last?.status === 'failed') verdict = '알려진 실패 재현';
+      else if (test.expectedStatus === 'failed' && last?.status === 'failed') {
+        // Only a test that checked the known symptom itself (symptom-confirmed) counts as a confirmed reproduction.
+        const annotations = [...(test.annotations ?? []), ...(last.annotations ?? [])];
+        verdict = annotations.some(a => a.type === 'symptom-confirmed') ? CONFIRMED : UNCONFIRMED;
+      }
       else if (test.expectedStatus === 'passed' && last?.status === 'passed') verdict = 'Pass';
       else throw new Error('기대 상태와 실행 결과가 일치하지 않습니다.');
       // Allowlisted identifiers only: no titles, error bodies, credentials or local paths.
@@ -30,19 +41,23 @@ function summarize(report) {
   }
   walk(report);
   if (!rows.length) throw new Error('테스트 결과가 없습니다.');
+  const suite = Object.keys(SUITES).find(k => rows.every(r => SUITES[k].includes(r.project)));
+  if (!suite) throw new Error('기본 스위트와 재구현판 결과가 한 파일에 섞여 있습니다.');
   const stats = report.stats;
   for (const key of ['expected', 'unexpected', 'flaky', 'skipped']) {
     if (!Number.isInteger(stats[key]) || stats[key] < 0) throw new Error('결과 통계가 올바르지 않습니다.');
   }
   const counts = Object.fromEntries(LABELS.map(label => [label, rows.filter(r => r.verdict === label).length]));
-  if (stats.expected !== counts.Pass + counts['알려진 실패 재현']
+  if (stats.expected !== counts.Pass + counts[CONFIRMED] + counts[UNCONFIRMED]
     || stats.unexpected !== counts['예상 밖 결과'] || stats.flaky !== counts.Flaky || stats.skipped !== counts.Skip) throw new Error('개별 결과와 집계 통계가 다릅니다.');
   if (!Number.isFinite(Date.parse(stats.startTime))) throw new Error('실행 시각이 없습니다.');
+  const bugsOf = label => [...new Set(rows.filter(r => r.verdict === label).flatMap(r => r.bugs))].sort();
   return {
     rows, counts, startTime: new Date(stats.startTime).toISOString(), errors: report.errors.length,
-    projects: PROJECTS.filter(p => rows.some(r => r.project === p)),
-    missing: PROJECTS.filter(p => !rows.some(r => r.project === p)),
-    bugs: [...new Set(rows.filter(r => r.verdict === '알려진 실패 재현').flatMap(r => r.bugs))].sort(),
+    projects: SUITES[suite].filter(p => rows.some(r => r.project === p)),
+    missing: SUITES[suite].filter(p => !rows.some(r => r.project === p)),
+    confirmedBugs: bugsOf(CONFIRMED),
+    unconfirmedBugs: bugsOf(UNCONFIRMED),
   };
 }
 function markdown(s) {
@@ -54,8 +69,9 @@ function markdown(s) {
     '', '| 구분 | 건수 |', '|---|---:|',
     ...Object.entries(s.counts).map(([k, v]) => '| ' + k + ' | ' + v + ' |'),
     '| 실행 오류 | ' + s.errors + ' |',
-    '', '알려진 실패 재현은 정상 Pass와 별도입니다. test.fail()의 기대 실패를 집계하며 실패 원인의 동일성까지 보증하지 않습니다.',
-    '재현된 결함 ID: ' + (s.bugs.join(', ') || '없음'),
+    '', '결함 재현 확인은 테스트가 알려진 증상을 직접 확인한 기대 실패입니다. 기대 실패—원인 미확인은 test.fail()대로 실패했지만 그 실패가 해당 결함 때문인지 확인하지 않은 경우입니다.',
+    '결함 재현 확인 ID: ' + (s.confirmedBugs.join(', ') || '없음'),
+    '원인 미확인 결함 ID: ' + (s.unconfirmedBugs.join(', ') || '없음'),
     'Flaky·Skip·예상 밖 결과·실행 오류를 함께 검토하십시오. 이 요약은 Job 종료 상태나 릴리스 승인을 대신하지 않습니다.',
     '외부 사이트 Job은 참고용으로 전체 워크플로 실패를 허용합니다. 이 결과에는 Newman이 포함되지 않습니다.', '',
   ].join('\n');
@@ -66,14 +82,14 @@ function html(s, hash) {
   return '<!doctype html>\n<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
     + '<title>QA 테스트 결과 — ' + e(s.startTime.slice(0, 10)) + '</title>'
     + '<style>body{font:16px/1.65 system-ui,sans-serif;max-width:1050px;margin:40px auto;padding:0 20px;color:#172536;background:#f7f9fc}table{border-collapse:collapse;width:100%;background:white;margin:20px 0}th,td{text-align:left;padding:10px;border-bottom:1px solid #dce2eb}th{background:#e7eef7}.notice{border-left:4px solid #ad6700;background:#fff2d8;padding:16px}code{overflow-wrap:anywhere}a{color:#0757aa}</style>'
-    + '<main><h1>QA 테스트 결과</h1><p class="notice">보관된 로컬 Playwright 실행의 정적 스냅샷입니다. 최신 CI 상태나 릴리스 승인 결과가 아닙니다. 알려진 실패 재현은 제품 결함 해결을 뜻하지 않습니다.</p>'
+    + '<main><h1>QA 테스트 결과</h1><p class="notice">보관된 로컬 Playwright 실행의 정적 스냅샷입니다. 최신 CI 상태나 릴리스 승인 결과가 아닙니다. 기대 실패는 제품 결함 해결을 뜻하지 않습니다.</p>'
     + '<p>실행 시각(UTC): ' + e(s.startTime) + '<br>결과가 있는 프로젝트: ' + e(s.projects.join(', '))
     + '<br>결과가 없는 프로젝트: ' + e(s.missing.join(', ') || '없음') + '</p>'
     + '<table><caption>총 ' + s.rows.length + '건 — 브라우저별 실행과 setup 포함, Newman 제외</caption><thead><tr><th scope="col">구분</th><th scope="col">건수</th></tr></thead><tbody>'
     + Object.entries(s.counts).map(([k, v]) => '<tr><td>' + e(k) + '</td><td>' + v + '</td></tr>').join('')
     + '<tr><td>실행 오류</td><td>' + s.errors + '</td></tr></tbody></table>'
-    + '<p>재현된 결함 ID: ' + e(s.bugs.join(', ') || '없음') + '</p>'
-    + '<p>알려진 실패는 test.fail()과 마지막 실행 상태로 분류합니다. 같은 원인으로 실패했는지까지 증명하지 않습니다. Flaky·Skip·예상 밖 결과는 별도로 검토해야 합니다.</p>'
+    + '<p>결함 재현 확인 ID: ' + e(s.confirmedBugs.join(', ') || '없음') + '<br>원인 미확인 결함 ID: ' + e(s.unconfirmedBugs.join(', ') || '없음') + '</p>'
+    + '<p>기대 실패 중 테스트가 알려진 증상을 직접 확인한 것만 결함 재현 확인으로 분류합니다. 나머지 기대 실패는 같은 원인으로 실패했는지 증명하지 않습니다. Flaky·Skip·예상 밖 결과는 별도로 검토해야 합니다.</p>'
     + '<p><a href="https://github.com/ganggeon/qa-automation-playwright/blob/master/artifacts/03-%EA%B2%B0%ED%95%A8%EB%A6%AC%ED%8F%AC%ED%8A%B8.md">결함 내용과 재현 절차</a> · <a href="https://github.com/ganggeon/qa-automation-playwright/actions/workflows/qa.yml">최신 CI 실행 확인</a></p>'
     + '<h2>테스트별 결과</h2><p>공개 범위: 테스트 ID·프로젝트·판정·결함 ID. 원본 요청/응답, 계정, 로컬 경로, 스크린샷·영상·trace는 포함하지 않습니다.</p>'
     + '<table><thead><tr><th scope="col">테스트 ID</th><th scope="col">프로젝트</th><th scope="col">판정</th><th scope="col">관련 결함</th></tr></thead><tbody>'
