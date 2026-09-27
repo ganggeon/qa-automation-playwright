@@ -22,6 +22,7 @@
 **배지는 master의 CI 상태이며 제품 결함 해결이나 릴리스 승인을 뜻하지 않습니다.**
 Newman은 알려진 결함 BUG-001/006/008의 예상 재현을 별도 판정하고, 외부 사이트 Job은 실패를 허용합니다.
 PR에서는 Firefox·WebKit Job을 실행하지 않습니다. 검사 범위와 개별 결과는 각 Job의 Summary와 아티팩트를 확인하십시오.
+master 실행이 끝나면 Job별 결과와 실행 링크를 Slack 채널로 보냅니다([CI 결과 알림](#ci-결과-알림)).
 
 **[공개 HTML 테스트 리포트 보기](https://ganggeon.github.io/qa-automation-playwright/)**
 
@@ -127,7 +128,7 @@ npm run report    # HTML 리포트 열기
 | `fixtures/` | 테스트 격리를 위한 픽스처 (계정 자동 생성) |
 | `utils/schema.ts` | JSON Schema 계약 검증 |
 | `postman/` | Postman 컬렉션 + Newman — **대표 Smoke/재현 컬렉션**(BUG-001·006·008). 전수 검증은 Playwright 담당 |
-| `.github/workflows/qa.yml` | CI — 4개 Job 분리 |
+| `.github/workflows/qa.yml` | CI — 테스트 Job 5개 분리 + master 결과 Slack 알림 |
 
 > 프로젝트 초기에 참고한 개념 노트·CI/CD 계획서는 [`archive/learning-2026-08`](../../tree/archive/learning-2026-08/docs) 브랜치에 보관합니다.
 
@@ -223,6 +224,15 @@ FR-06-4는 "장바구니에 이미 있는 수량과 합산한다 + 합산 결과
 | **명세 리뷰(정적 테스트)** | 기준 문서 자체의 결함을 검토. 테스트 구축 후 전체 검토(2026-08-03)에서 명세 결함 6건을 찾아 별도 리포트 |
 | **외부 의존 분리** | 남의 서버 장애가 우리 빌드를 막지 않도록 CI Job 분리 + `continue-on-error` |
 | **리포트 자동화** | 실행 결과 JSON → QA 결과 보고서(CSV/MD) 자동 변환 |
+| **CI 결과 알림** | master 실행 결과를 Slack으로 전송. 필수 Job이 **모두 정확히 성공일 때만 "통과"**, 실패·취소·미실행·결과 누락은 "통과 아님". `continue-on-error` 때문에 실패해도 성공으로 보이는 외부 사이트 결과는 테스트 단계의 실제 결과로 따로 표시. 알림의 "통과"는 릴리스 승인이 아님을 메시지에 명시 |
+
+### CI 결과 알림
+
+테스트 Job이 모두 끝난 뒤 알림 Job이 실행되고(앞 Job이 실패해도 실행), Job별 결과와 실행 링크를 보냅니다. 판정 규칙은 [`utils/slack-notify.js`](utils/slack-notify.js), 단위 테스트는 [`utils/slack-notify.test.js`](utils/slack-notify.test.js)에 있습니다.
+
+![master 실행 후 Slack 알림](docs/images/slack-notify.png)
+
+![테스트 Job 5개가 끝난 뒤 Slack 알림 Job 실행](docs/images/ci-run-notify.png)
 
 ---
 
