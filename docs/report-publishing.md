@@ -3,10 +3,12 @@
 README의 CI 배지는 master의 QA Test Suite 상태다. 외부 사이트 Job은 실패가 허용되고,
 Newman은 알려진 결함 3건의 정확한 재현을 별도 판정하므로 초록불이 제품 정상이나 릴리스 승인은 아니다.
 
-utils/playwright-summary.js는 기존 Playwright JSON을 읽어 정상 Pass, 알려진 실패 재현,
-예상 밖 결과(기대 실패가 통과한 경우 포함), Flaky, Skip, 실행 오류를 분리한다.
+utils/playwright-summary.js는 기존 Playwright JSON을 읽어 정상 Pass, 결함 재현 확인,
+기대 실패—원인 미확인, 예상 밖 결과(기대 실패가 통과한 경우 포함), Flaky, Skip, 실행 오류를 분리한다.
 결과가 있는/없는 프로젝트를 표시하며 테스트를 실행하지 않는다.
-test.fail() 재현은 같은 결함 원인의 재현까지 보증하지 않는다. Newman 판정은 별도다.
+결함 재현 확인은 테스트가 알려진 증상을 직접 확인하고 `symptom-confirmed` 표시를 남긴 기대 실패만 센다
+(현재 `tests/rebuilt/`의 잠금 테스트). 나머지 test.fail() 기대 실패는 같은 결함 원인인지 보증하지 않으므로
+원인 미확인으로 따로 센다. Newman 판정은 별도다.
 JSON이 없거나 통계가 맞지 않으면 요약 생성 단계도 실패한다.
 
 ## 실행 출처

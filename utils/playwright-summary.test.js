@@ -6,17 +6,32 @@ function report(tests, errors = []) {
   for (const t of tests) stats[t.status]++;
   return { stats, errors, suites: [{ suites: [{ specs: tests.map(t => ({ title: 'TC-API-EXAMPLE-001 | private-title', tests: [{ projectName: 'api', expectedStatus: 'passed', results: [{ status: 'passed' }], ...t }] })) }] }] };
 }
-test('normal pass and reproduced expected failures remain separate', () => {
+test('normal pass and expected failures without a symptom check remain separate', () => {
   const s = summarize(report([{ status: 'expected' }, { status: 'expected', expectedStatus: 'failed', results: [{ status: 'failed' }], annotations: [{ type: 'fail', description: 'BUG-001: private-details' }] }]));
   assert.equal(s.counts.Pass, 1);
-  assert.equal(s.counts['알려진 실패 재현'], 1);
-  assert.deepEqual(s.bugs, ['BUG-001']);
+  assert.equal(s.counts['기대 실패—원인 미확인'], 1);
+  assert.equal(s.counts['결함 재현 확인'], 0);
+  assert.deepEqual(s.unconfirmedBugs, ['BUG-001']);
+  assert.deepEqual(s.confirmedBugs, []);
+});
+test('only an expected failure with symptom-confirmed counts as a confirmed reproduction', () => {
+  const s = summarize(report([{ status: 'expected', projectName: 'rebuilt-api', expectedStatus: 'failed', results: [{ status: 'failed' }], annotations: [{ type: 'symptom-confirmed', description: 'BUG-004' }, { type: 'fail', description: 'BUG-004: private-details' }] }]));
+  assert.equal(s.counts['결함 재현 확인'], 1);
+  assert.equal(s.counts['기대 실패—원인 미확인'], 0);
+  assert.deepEqual(s.confirmedBugs, ['BUG-004']);
+  assert.deepEqual(s.projects, ['rebuilt-api']);
+  assert.deepEqual(s.missing, ['rebuilt-ui']);
+});
+test('rejects a report that mixes the main and rebuilt suites', () => {
+  assert.throws(() => summarize(report([{ status: 'expected' }, { status: 'expected', projectName: 'rebuilt-api' }])), /섞여/);
 });
 test('unexpected pass of a known failure is not a reproduced defect', () => {
   const s = summarize(report([{ status: 'unexpected', expectedStatus: 'failed', annotations: [{ type: 'fail', description: 'BUG-001' }] }]));
   assert.equal(s.counts['예상 밖 결과'], 1);
-  assert.equal(s.counts['알려진 실패 재현'], 0);
-  assert.deepEqual(s.bugs, []);
+  assert.equal(s.counts['결함 재현 확인'], 0);
+  assert.equal(s.counts['기대 실패—원인 미확인'], 0);
+  assert.deepEqual(s.confirmedBugs, []);
+  assert.deepEqual(s.unconfirmedBugs, []);
 });
 test('flaky and skipped cases do not become normal passes', () => {
   const s = summarize(report([{ status: 'flaky' }, { status: 'skipped', results: [] }]));
