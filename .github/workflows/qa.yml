@@ -30,6 +30,9 @@ jobs:
       - name: 결과 요약 분류 검증
         run: node --test utils/playwright-summary.test.js
 
+      - name: Slack 알림 판정 검증
+        run: node --test utils/slack-notify.test.js
+
       - name: 타입 검사
         run: npm run typecheck
 
@@ -96,6 +99,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     continue-on-error: true
+    # continue-on-error 때문에 needs.external.result 는 실패해도 success 로 보인다.
+    # 알림에는 테스트 단계의 실제 결과(outcome)를 따로 넘긴다.
+    outputs:
+      tests: ${{ steps.tests.outcome }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -104,7 +111,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test --project=external-api --project=external-ui
+      - id: tests
+        run: npx playwright test --project=external-api --project=external-ui
 
       - name: Playwright 실행 요약
         if: ${{ !cancelled() }}
@@ -141,3 +149,49 @@ jobs:
           name: newman-report
           path: reports/newman/
           retention-days: 14
+
+  # ── 5. 로그인 재구현판 (전용 설정: 4011 포트, /api/_reset 미사용) ──────────
+  rebuilt:
+    name: 로그인 재구현판 (API + UI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test -c playwright.rebuilt.config.ts
+
+      - name: Playwright 실행 요약
+        if: ${{ !cancelled() }}
+        run: node utils/playwright-summary.js reports/rebuilt-results.json
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: rebuilt-report
+          path: playwright-report-rebuilt/
+          retention-days: 14
+
+  # ── 6. Slack 알림 (master 실행만) ─────────────────────────────────────────
+  #     앞 Job이 실패해도 알림은 가야 하므로 always()로 실행한다.
+  #     필수 Job이 모두 정확히 success일 때만 "통과"로 보낸다(utils/slack-notify.js).
+  #     워크플로 전체가 강제 취소된 경우까지는 보장하지 않는다.
+  notify:
+    name: Slack 알림
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [local, rebuilt, cross-browser, external, newman]
+    if: ${{ always() && github.ref == 'refs/heads/master' && github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 결과 알림 보내기
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: node utils/slack-notify.js
